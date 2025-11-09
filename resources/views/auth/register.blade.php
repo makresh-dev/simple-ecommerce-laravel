@@ -21,7 +21,7 @@
             <div class="col-lg-5 col-12">
                 <div id="auth-left">
                     <div class="auth-logo d-flex justify-content-center">
-                      <a href="/"><h1><u>ECM</u></h1></a>
+                      <a href="/"><h1><u>ECM MKN</u></h1></a>
                     </div>
                     <h2 class="text-center">Register.</h2>
                     
