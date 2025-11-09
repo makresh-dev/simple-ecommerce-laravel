@@ -1,4 +1,4 @@
-name: 🚀 Laravel Docker CI/CD (Build → Test → Deploy → Verify)
+name: "🚀 Laravel Docker CI/CD (Build → Test → Deploy → Verify)"
 
 on:
   push:
@@ -35,24 +35,24 @@ jobs:
       APP_URL: http://localhost
 
     steps:
-      - name: 🧭 Checkout Code
+      - name: "🧭 Checkout Code"
         uses: actions/checkout@v3
 
-      - name: 🧱 Setup PHP
+      - name: "🧱 Setup PHP"
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
+          php-version: "8.2"
           extensions: mbstring, xml, bcmath, mysql, zip, gd
 
-      - name: 📦 Install Composer Dependencies
+      - name: "📦 Install Composer Dependencies"
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
-      - name: 🔧 Fix Permissions Pre-Build
+      - name: "🔧 Fix Permissions Pre-Build"
         run: |
           sudo chown -R $USER:$USER storage bootstrap/cache || true
           sudo chmod -R 775 storage bootstrap/cache || true
 
-      - name: ⏳ Wait for MySQL
+      - name: "⏳ Wait for MySQL"
         run: |
           echo "⏳ Waiting for MySQL..."
           until mysqladmin ping -h127.0.0.1 -proot --silent; do
@@ -60,21 +60,21 @@ jobs:
           done
           echo "✅ MySQL Ready!"
 
-      - name: 🔑 Generate App Key
+      - name: "🔑 Generate App Key"
         run: php artisan key:generate --force
 
-      - name: 📜 Run Migrations
+      - name: "📜 Run Migrations"
         run: php artisan migrate --force
 
-      - name: 🧪 Run Laravel Tests
+      - name: "🧪 Run Laravel Tests"
         run: php artisan test --env=testing
 
-      - name: 🐳 Build Docker Image
-        run: docker build -t ${{secrets.APP_DIR}} .
+      - name: "🐳 Build Docker Image"
+        run: "docker build -t ${{ secrets.APP_DIR }} ."
 
-      - name: ✅ Verify Container Startup
+      - name: "✅ Verify Container Startup"
         run: |
-          docker run -d --name laravel-test -p 9000:9000 ${{secrets.APP_DIR}}
+          docker run -d --name laravel-test -p 9000:9000 ${{ secrets.APP_DIR }}
           sleep 10
           docker ps
           docker logs laravel-test
@@ -86,7 +86,7 @@ jobs:
     if: success()
 
     steps:
-      - name: 🚀 Deploy to AWS EC2
+      - name: "🚀 Deploy to AWS EC2"
         uses: appleboy/ssh-action@v0.1.7
         with:
           host: ${{ secrets.HOST }}
@@ -103,6 +103,7 @@ jobs:
             sudo find /var/www/${{ secrets.APP_DIR }} -type f -exec chmod 664 {} \;
             sudo chmod -R ug+rwx /var/www/${{ secrets.APP_DIR }}/storage /var/www/${{ secrets.APP_DIR }}/bootstrap/cache
             sudo find /var/www/${{ secrets.APP_DIR }} -type d -exec chmod g+s {} \;
+
             echo "🐳 Rebuilding containers..."
             docker-compose down
             docker-compose up -d --build
@@ -116,7 +117,7 @@ jobs:
     if: success()
 
     steps:
-      - name: 🔍 Verify Laravel Permissions on EC2
+      - name: "🔍 Verify Laravel Permissions on EC2"
         uses: appleboy/ssh-action@v0.1.7
         with:
           host: ${{ secrets.HOST }}
@@ -124,16 +125,15 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           script: |
             echo "🔍 Checking Laravel file and directory permissions..."
-
             cd /var/www/${{ secrets.APP_DIR }}
 
-            echo "📂 Checking ownership (should be www-data):"
+            echo "📂 Ownership check:"
             sudo stat -c "%U:%G %n" storage bootstrap/cache | uniq
 
-            echo "📁 Checking directory permissions (should be 775):"
+            echo "📁 Directory permissions (expect 775):"
             sudo find storage bootstrap/cache -type d -exec stat -c "%a %n" {} \; | grep -v "775" && echo "⚠️ Incorrect directory permissions found!" || echo "✅ Directory permissions OK."
 
-            echo "📄 Checking file permissions (should be 664):"
+            echo "📄 File permissions (expect 664):"
             sudo find storage bootstrap/cache -type f -exec stat -c "%a %n" {} \; | grep -v "664" && echo "⚠️ Incorrect file permissions found!" || echo "✅ File permissions OK."
 
             echo "🧬 Checking group inheritance (setgid bit):"
