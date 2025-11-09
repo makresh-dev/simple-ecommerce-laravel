@@ -2,7 +2,7 @@ name: "🚀 Laravel Docker CI/CD (Build → Test → Deploy → Verify)"
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
 
 jobs:
   # 1️⃣ BUILD AND TEST JOB
