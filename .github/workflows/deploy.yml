@@ -119,9 +119,9 @@ jobs:
       - name: 🔍 Verify Laravel Permissions on EC2
         uses: appleboy/ssh-action@v0.1.7
         with:
-          host: ${{ secrets.EC2_HOST }}
+          host: ${{ secrets.HOST }}
           username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
+          key: ${{ secrets.SSH_KEY }}
           script: |
             echo "🔍 Checking Laravel file and directory permissions..."
 
