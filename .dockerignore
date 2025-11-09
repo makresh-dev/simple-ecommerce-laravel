@@ -1,0 +1,16 @@
+.git
+.gitignore
+node_modules
+vendor
+storage/logs/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+.env
+.env.*
+*.log
+.idea
+.vscode
+# Any large data, tests, docs not needed to build
+docs
+tests

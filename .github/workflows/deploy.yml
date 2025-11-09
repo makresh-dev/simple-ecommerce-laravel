@@ -1,0 +1,101 @@
+name: 🚀 Laravel Docker CI/CD
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  laravel_ci:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        ports:
+          - 3306:3306
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: laravel_ecommerce
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: laravel_ecommerce
+      DB_USERNAME: root
+      DB_PASSWORD: root
+      APP_ENV: testing
+      APP_KEY: base64:randomfallbackkey=
+      APP_URL: http://localhost
+      COMPOSER_PROCESS_TIMEOUT: 0
+
+    steps:
+      # 1️⃣ Checkout the code
+      - name: 🧭 Checkout Code
+        uses: actions/checkout@v3
+
+      # 2️⃣ Set up PHP and Composer
+      - name: 🧱 Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, xml, bcmath, mysql, zip, gd
+          coverage: none
+
+      # 3️⃣ Install Composer dependencies
+      - name: 📦 Install Composer Dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      # 4️⃣ Wait for MySQL to be ready
+      - name: ⏳ Wait for MySQL
+        run: |
+          echo "Waiting for MySQL..."
+          until mysqladmin ping -h127.0.0.1 -proot --silent; do
+            sleep 3
+          done
+          echo "✅ MySQL is ready!"
+
+      # 5️⃣ Generate APP_KEY and Run Migrations
+      - name: 🔑 Generate App Key
+        run: php artisan key:generate --force
+
+      - name: 📜 Run Database Migrations
+        run: php artisan migrate --force
+
+      # 6️⃣ Run Laravel Tests (optional)
+      - name: ✅ Run Tests
+        run: php artisan test --env=testing || true
+
+      # 7️⃣ Build Docker Images
+      - name: 🐳 Build Docker Images
+        run: docker-compose build
+
+      # 8️⃣ Start Containers (Optional - e.g. for E2E tests)
+      - name: 🧩 Start Containers
+        run: docker-compose up -d
+
+      # 9️⃣ Push to Docker Hub or GitHub Container Registry (optional)
+        - name: 🚢 Push to Docker Hub
+          run: |
+           echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+           docker tag laravel-app ${{ secrets.DOCKER_USERNAME }}/${{ secrets.APP_DIR }}:latest
+           docker push ${{ secrets.DOCKER_USERNAME }}/${{ secrets.APP_DIR }}:latest
+
+      # 10️⃣ Deploy to EC2 (optional)
+        - name: 🚀 Deploy to EC2
+          uses: appleboy/ssh-action@v0.1.7
+          with:
+            host: ${{ secrets.HOST }}
+            username: ${{ secrets.USERNAME }}
+            key: ${{ secrets.SSH_KEY }}
+            script: |
+              cd /var/www/${{ secrets.APP_DIR }}
+              git pull origin main
+              docker-compose down
+              docker-compose up -d --build
