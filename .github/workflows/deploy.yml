@@ -43,8 +43,8 @@ jobs:
           php-version: "8.2"
           extensions: mbstring, xml, bcmath, mysql, zip, gd
 
-      - name: 📦 Install Composer Dependencies
-        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+      - name: 📦 Install Composer Dependencies (with dev)
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader --dev
 
       - name: 🔧 Fix Permissions Pre-Build
         run: |
@@ -58,14 +58,16 @@ jobs:
             sleep 3
           done
           echo "✅ MySQL Ready!"
-
+      
       - name: 🐳 Build Laravel Docker Image
         run: |
-          docker build -t ${{ secrets.APP_DIR }} .
+          docker build --build-arg APP_ENV=production -t ${{ secrets.APP_DIR }} .
 
       - name: 🐳 Start Laravel Container
         run: |
           docker run -d --name laravel-app \
+            -e APP_ENV=production \
+            -e APP_DEBUG=false \
             -e DB_CONNECTION=mysql \
             -e DB_HOST=127.0.0.1 \
             -e DB_PORT=3306 \
@@ -78,15 +80,15 @@ jobs:
 
       - name: 🔑 Generate App Key (inside container)
         run: |
-          docker exec laravel-app php artisan key:generate --force
+          docker exec laravel-app bash -c "APP_ENV=production php artisan key:generate --force"
 
       - name: 📜 Run Migrations (inside container)
         run: |
-          docker exec laravel-app php artisan migrate --force
+          docker exec laravel-app bash -c "APP_ENV=production php artisan migrate --force"
 
       - name: 🧪 Run Tests (inside container)
         run: |
-          docker exec laravel-app php artisan test --env=testing
+          docker exec laravel-app bash -c "APP_ENV=production php artisan test --env=testing"
 
       - name: 🧹 Cleanup Build Container
         run: |
