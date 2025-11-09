@@ -61,13 +61,13 @@ jobs:
           echo "✅ MySQL Ready!"
 
       - name: "🔑 Generate App Key"
-        run: php artisan key:generate --force
+        run: "php artisan key:generate --force"
 
       - name: "📜 Run Migrations"
-        run: php artisan migrate --force
+        run: "php artisan migrate --force"
 
       - name: "🧪 Run Laravel Tests"
-        run: php artisan test --env=testing
+        run: "php artisan test --env=testing"
 
       - name: "🐳 Build Docker Image"
         run: "docker build -t ${{ secrets.APP_DIR }} ."
