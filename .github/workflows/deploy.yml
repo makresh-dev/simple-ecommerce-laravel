@@ -31,14 +31,13 @@ jobs:
       DB_USERNAME: root
       DB_PASSWORD: root
       APP_ENV: testing
-      APP_KEY: base64:temporaryKey=
       APP_URL: http://localhost
 
     steps:
       - name: 🧭 Checkout Code
         uses: actions/checkout@v4
 
-      - name: 🧱 Setup PHP
+      - name: 🧱 Setup PHP (for composer only)
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.2"
@@ -60,28 +59,39 @@ jobs:
           done
           echo "✅ MySQL Ready!"
 
-      - name: 🔑 Generate App Key
+      - name: 🐳 Build Laravel Docker Image
         run: |
-          php artisan key:generate --force
+          docker build -t ${{ secrets.APP_DIR }} .
 
-      - name: 📜 Run Migrations
+      - name: 🐳 Start Laravel Container
         run: |
-          php artisan migrate --force
-
-      - name: 🧪 Run Laravel Tests
-        run: |
-          php artisan test --env=testing
-
-      - name: 🐳 Build Docker Image
-        run: |
-           docker build -t ${{ secrets.APP_DIR }} .
-
-      - name: ✅ Verify Container Startup
-        run: |
-          docker run -d --name laravel-test -p 9000:9000 ${{ secrets.APP_DIR }}
-          sleep 10
+          docker run -d --name laravel-app \
+            -e DB_CONNECTION=mysql \
+            -e DB_HOST=127.0.0.1 \
+            -e DB_PORT=3306 \
+            -e DB_DATABASE=laravel_ecommerce \
+            -e DB_USERNAME=root \
+            -e DB_PASSWORD=root \
+            -p 9000:9000 ${{ secrets.APP_DIR }}
+          sleep 15
           docker ps
-          docker logs laravel-test
+
+      - name: 🔑 Generate App Key (inside container)
+        run: |
+          docker exec laravel-app php artisan key:generate --force
+
+      - name: 📜 Run Migrations (inside container)
+        run: |
+          docker exec laravel-app php artisan migrate --force
+
+      - name: 🧪 Run Tests (inside container)
+        run: |
+          docker exec laravel-app php artisan test --env=testing
+
+      - name: 🧹 Cleanup Build Container
+        run: |
+          docker stop laravel-app || true
+          docker rm laravel-app || true
 
   # 2️⃣ DEPLOY TO EC2
   deploy:
@@ -99,11 +109,11 @@ jobs:
           script: |
             echo "🧱 Pulling latest code..."
             cd /var/www/${{ secrets.APP_DIR }}
-            git pull origin main
+            git pull origin master
 
             echo "🔧 Fixing ownership and permissions..."
             sudo chown -R root:www-data /var/www/${{ secrets.APP_DIR }}
-            sudo chmod 755 /var/www/${{ secrets.APP_DIR }}
+            sudo chmod 750 /var/www/${{ secrets.APP_DIR }}
             sudo find /var/www/${{ secrets.APP_DIR }} -type d -exec chmod 755 {} \;
             sudo find /var/www/${{ secrets.APP_DIR }} -type f -exec chmod 644 {} \;
             sudo chmod -R ug+rwx /var/www/${{ secrets.APP_DIR }}/storage /var/www/${{ secrets.APP_DIR }}/bootstrap/cache
@@ -135,11 +145,11 @@ jobs:
             echo "📂 Ownership check:"
             sudo stat -c "%U:%G %n" storage bootstrap/cache | uniq
 
-            echo "📁 Directory permissions (expect 775):"
-            sudo find storage bootstrap/cache -type d -exec stat -c "%a %n" {} \; | grep -v "775" && echo "⚠️ Incorrect directory permissions found!" || echo "✅ Directory permissions OK."
+            echo "📁 Directory permissions (expect 755):"
+            sudo find storage bootstrap/cache -type d -exec stat -c "%a %n" {} \; | grep -v "755" && echo "⚠️ Incorrect directory permissions found!" || echo "✅ Directory permissions OK."
 
-            echo "📄 File permissions (expect 664):"
-            sudo find storage bootstrap/cache -type f -exec stat -c "%a %n" {} \; | grep -v "664" && echo "⚠️ Incorrect file permissions found!" || echo "✅ File permissions OK."
+            echo "📄 File permissions (expect 644):"
+            sudo find storage bootstrap/cache -type f -exec stat -c "%a %n" {} \; | grep -v "644" && echo "⚠️ Incorrect file permissions found!" || echo "✅ File permissions OK."
 
             echo "🧬 Checking group inheritance (setgid bit):"
             sudo find storage bootstrap/cache -maxdepth 1 -type d -printf "%M %n\n" | grep "s" && echo "✅ Group inheritance enabled." || echo "⚠️ setgid bit missing on some directories."
