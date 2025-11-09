@@ -70,11 +70,11 @@ jobs:
         run: php artisan test --env=testing
 
       - name: 🐳 Build Docker Image
-        run: docker build -t laravel-app:latest .
+        run: docker build -t ${{secrets.APP_DIR}} .
 
       - name: ✅ Verify Container Startup
         run: |
-          docker run -d --name laravel-test -p 9000:9000 laravel-app:latest
+          docker run -d --name laravel-test -p 9000:9000 ${{secrets.APP_DIR}}
           sleep 10
           docker ps
           docker logs laravel-test
