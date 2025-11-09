@@ -1,12 +1,12 @@
-name: 🚀 Laravel Docker CI/CD
+name: 🚀 Laravel Docker CI/CD (Build → Test → Deploy → Verify)
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
 
 jobs:
-  laravel_ci:
+  # 1️⃣ BUILD AND TEST JOB
+  build_and_test:
     runs-on: ubuntu-latest
 
     services:
@@ -31,71 +31,112 @@ jobs:
       DB_USERNAME: root
       DB_PASSWORD: root
       APP_ENV: testing
-      APP_KEY: base64:randomfallbackkey=
+      APP_KEY: base64:temporaryKey=
       APP_URL: http://localhost
-      COMPOSER_PROCESS_TIMEOUT: 0
 
     steps:
-      # 1️⃣ Checkout the code
       - name: 🧭 Checkout Code
         uses: actions/checkout@v3
 
-      # 2️⃣ Set up PHP and Composer
       - name: 🧱 Setup PHP
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
           extensions: mbstring, xml, bcmath, mysql, zip, gd
-          coverage: none
 
-      # 3️⃣ Install Composer dependencies
       - name: 📦 Install Composer Dependencies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
-      # 4️⃣ Wait for MySQL to be ready
+      - name: 🔧 Fix Permissions Pre-Build
+        run: |
+          sudo chown -R $USER:$USER storage bootstrap/cache || true
+          sudo chmod -R 775 storage bootstrap/cache || true
+
       - name: ⏳ Wait for MySQL
         run: |
-          echo "Waiting for MySQL..."
+          echo "⏳ Waiting for MySQL..."
           until mysqladmin ping -h127.0.0.1 -proot --silent; do
             sleep 3
           done
-          echo "✅ MySQL is ready!"
+          echo "✅ MySQL Ready!"
 
-      # 5️⃣ Generate APP_KEY and Run Migrations
       - name: 🔑 Generate App Key
         run: php artisan key:generate --force
 
-      - name: 📜 Run Database Migrations
+      - name: 📜 Run Migrations
         run: php artisan migrate --force
 
-      # 6️⃣ Run Laravel Tests (optional)
-      - name: ✅ Run Tests
-        run: php artisan test --env=testing || true
+      - name: 🧪 Run Laravel Tests
+        run: php artisan test --env=testing
 
-      # 7️⃣ Build Docker Images
-      - name: 🐳 Build Docker Images
-        run: docker-compose build
+      - name: 🐳 Build Docker Image
+        run: docker build -t laravel-app:latest .
 
-      # 8️⃣ Start Containers (Optional - e.g. for E2E tests)
-      - name: 🧩 Start Containers
-        run: docker-compose up -d
+      - name: ✅ Verify Container Startup
+        run: |
+          docker run -d --name laravel-test -p 9000:9000 laravel-app:latest
+          sleep 10
+          docker ps
+          docker logs laravel-test
 
-      # 9️⃣ Push to Docker Hub or GitHub Container Registry (optional)
-        - name: 🚢 Push to Docker Hub
-          run: |
-           echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
-           docker tag laravel-app ${{ secrets.DOCKER_USERNAME }}/${{ secrets.APP_DIR }}:latest
-           docker push ${{ secrets.DOCKER_USERNAME }}/${{ secrets.APP_DIR }}:latest
+  # 2️⃣ DEPLOY TO EC2
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build_and_test
+    if: success()
 
-      # 10️⃣ Deploy to EC2 (optional)
-        - name: 🚀 Deploy to EC2
-          uses: appleboy/ssh-action@v0.1.7
-          with:
-            host: ${{ secrets.HOST }}
-            username: ${{ secrets.USER }}
-            key: ${{ secrets.SSH_KEY }}
-            script: |
-              cd /var/www/${{ secrets.APP_DIR }}
-              git pull origin main
-              docker-compose down
-              docker-compose up -d --build
+    steps:
+      - name: 🚀 Deploy to AWS EC2
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.HOST }}
+          username: ubuntu
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            echo "🧱 Pulling latest code..."
+            cd /var/www/${{ secrets.APP_DIR }}
+            git pull origin main
+
+            echo "🔧 Fixing ownership and permissions..."
+            sudo chown -R www-data:www-data /var/www/${{ secrets.APP_DIR }}
+            sudo find /var/www/${{ secrets.APP_DIR }} -type d -exec chmod 775 {} \;
+            sudo find /var/www/${{ secrets.APP_DIR }} -type f -exec chmod 664 {} \;
+            sudo chmod -R ug+rwx /var/www/${{ secrets.APP_DIR }}/storage /var/www/${{ secrets.APP_DIR }}/bootstrap/cache
+            sudo find /var/www/${{ secrets.APP_DIR }} -type d -exec chmod g+s {} \;
+            echo "🐳 Rebuilding containers..."
+            docker-compose down
+            docker-compose up -d --build
+
+            echo "✅ Deployment complete."
+
+  # 3️⃣ POST-DEPLOY PERMISSION VERIFICATION
+  verify:
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: success()
+
+    steps:
+      - name: 🔍 Verify Laravel Permissions on EC2
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            echo "🔍 Checking Laravel file and directory permissions..."
+
+            cd /var/www/${{ secrets.APP_DIR }}
+
+            echo "📂 Checking ownership (should be www-data):"
+            sudo stat -c "%U:%G %n" storage bootstrap/cache | uniq
+
+            echo "📁 Checking directory permissions (should be 775):"
+            sudo find storage bootstrap/cache -type d -exec stat -c "%a %n" {} \; | grep -v "775" && echo "⚠️ Incorrect directory permissions found!" || echo "✅ Directory permissions OK."
+
+            echo "📄 Checking file permissions (should be 664):"
+            sudo find storage bootstrap/cache -type f -exec stat -c "%a %n" {} \; | grep -v "664" && echo "⚠️ Incorrect file permissions found!" || echo "✅ File permissions OK."
+
+            echo "🧬 Checking group inheritance (setgid bit):"
+            sudo find storage bootstrap/cache -maxdepth 1 -type d -printf "%M %n\n" | grep "s" && echo "✅ Group inheritance enabled." || echo "⚠️ setgid bit missing on some directories."
+
+            echo "✅ Permission verification completed."
