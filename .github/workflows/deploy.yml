@@ -35,24 +35,24 @@ jobs:
       APP_URL: http://localhost
 
     steps:
-      - name: "🧭 Checkout Code"
+      - name: 🧭 Checkout Code
         uses: actions/checkout@v4
 
-      - name: "🧱 Setup PHP"
+      - name: 🧱 Setup PHP
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.2"
           extensions: mbstring, xml, bcmath, mysql, zip, gd
 
-      - name: "📦 Install Composer Dependencies"
+      - name: 📦 Install Composer Dependencies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
-      - name: "🔧 Fix Permissions Pre-Build"
+      - name: 🔧 Fix Permissions Pre-Build
         run: |
           sudo chown -R $USER:$USER storage bootstrap/cache || true
           sudo chmod -R 775 storage bootstrap/cache || true
 
-      - name: "⏳ Wait for MySQL"
+      - name: ⏳ Wait for MySQL
         run: |
           echo "⏳ Waiting for MySQL..."
           until mysqladmin ping -h127.0.0.1 -proot --silent; do
@@ -60,20 +60,23 @@ jobs:
           done
           echo "✅ MySQL Ready!"
 
-      - name: "🔑 Generate App Key"
-        run: "php artisan key:generate --force"
+      - name: 🔑 Generate App Key
+        run: |
+          php artisan key:generate --force
 
-      - name: "📜 Run Migrations"
-        run: "php artisan migrate --force"
+      - name: 📜 Run Migrations
+        run: |
+          php artisan migrate --force
 
-      - name: "🧪 Run Laravel Tests"
-        run: "php artisan test --env=testing"
+      - name: 🧪 Run Laravel Tests
+        run: |
+          php artisan test --env=testing
 
-      - name: "🐳 Build Docker Image"
+      - name: 🐳 Build Docker Image
         run: |
            docker build -t ${{ secrets.APP_DIR }} .
 
-      - name: "✅ Verify Container Startup"
+      - name: ✅ Verify Container Startup
         run: |
           docker run -d --name laravel-test -p 9000:9000 ${{ secrets.APP_DIR }}
           sleep 10
@@ -87,7 +90,7 @@ jobs:
     if: success()
 
     steps:
-      - name: "🚀 Deploy to AWS EC2"
+      - name: 🚀 Deploy to AWS EC2
         uses: appleboy/ssh-action@v0.1.7
         with:
           host: ${{ secrets.HOST }}
@@ -99,9 +102,9 @@ jobs:
             git pull origin main
 
             echo "🔧 Fixing ownership and permissions..."
-            sudo chown -R www-data:www-data /var/www/${{ secrets.APP_DIR }}
-            sudo find /var/www/${{ secrets.APP_DIR }} -type d -exec chmod 775 {} \;
-            sudo find /var/www/${{ secrets.APP_DIR }} -type f -exec chmod 664 {} \;
+            sudo chown -R root:www-data /var/www/${{ secrets.APP_DIR }}
+            sudo find /var/www/${{ secrets.APP_DIR }} -type d -exec chmod 755 {} \;
+            sudo find /var/www/${{ secrets.APP_DIR }} -type f -exec chmod 644 {} \;
             sudo chmod -R ug+rwx /var/www/${{ secrets.APP_DIR }}/storage /var/www/${{ secrets.APP_DIR }}/bootstrap/cache
             sudo find /var/www/${{ secrets.APP_DIR }} -type d -exec chmod g+s {} \;
 
@@ -118,7 +121,7 @@ jobs:
     if: success()
 
     steps:
-      - name: "🔍 Verify Laravel Permissions on EC2"
+      - name: 🔍 Verify Laravel Permissions on EC2
         uses: appleboy/ssh-action@v0.1.7
         with:
           host: ${{ secrets.HOST }}
