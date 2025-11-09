@@ -70,7 +70,8 @@ jobs:
         run: "php artisan test --env=testing"
 
       - name: "🐳 Build Docker Image"
-        run: "docker build -t ${{ secrets.APP_DIR }} ."
+        run: |
+           docker build -t ${{ secrets.APP_DIR }} .
 
       - name: "✅ Verify Container Startup"
         run: |
