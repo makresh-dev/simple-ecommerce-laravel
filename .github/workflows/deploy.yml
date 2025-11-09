@@ -103,6 +103,7 @@ jobs:
 
             echo "🔧 Fixing ownership and permissions..."
             sudo chown -R root:www-data /var/www/${{ secrets.APP_DIR }}
+            sudo chmod 755 /var/www/${{ secrets.APP_DIR }}
             sudo find /var/www/${{ secrets.APP_DIR }} -type d -exec chmod 755 {} \;
             sudo find /var/www/${{ secrets.APP_DIR }} -type f -exec chmod 644 {} \;
             sudo chmod -R ug+rwx /var/www/${{ secrets.APP_DIR }}/storage /var/www/${{ secrets.APP_DIR }}/bootstrap/cache
