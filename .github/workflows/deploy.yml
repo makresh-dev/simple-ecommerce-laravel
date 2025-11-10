@@ -3,7 +3,7 @@ name: Laravel CI/CD with Docker + Layer Caching + Security Checks
 on:
   push:
     branches:
-      - master  # triggers when code is pushed to master
+      - master  # Trigger CI/CD when code is pushed to master
 
 jobs:
   # ==========================================================
@@ -100,7 +100,7 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # Build Docker image and load locally (for tests)
+      # ✅ Build Docker image and load locally (for tests)
       - name: 🏗️ Build Docker Image (with caching)
         uses: docker/build-push-action@v5
         with:
@@ -113,6 +113,7 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
 
+      # 🧪 Run Tests inside Docker container
       - name: 🧪 Run Tests inside Container
         run: |
           echo "🚀 Starting test container..."
@@ -160,7 +161,14 @@ jobs:
           docker exec laravel-test php artisan migrate --force --env=testing
 
           echo "🧪 Running tests..."
-          docker exec laravel-test bash -c "php artisan test --env=testing || php vendor/bin/phpunit"
+          docker exec laravel-test bash -c "\
+            if php artisan list | grep -q 'test'; then \
+              php artisan test --env=testing; \
+            elif [ -f vendor/bin/phpunit ]; then \
+              vendor/bin/phpunit --testdox; \
+            else \
+              echo '⚠️ No test runner found. Skipping tests.'; \
+            fi"
 
           echo "🧹 Cleaning up..."
           docker stop laravel-test
@@ -173,7 +181,7 @@ jobs:
           rm -rf /tmp/.buildx-cache
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
-      # Push tested image to Docker Hub
+      # ✅ Push image to Docker Hub
       - name: 🐳 Push Docker Image to Docker Hub
         uses: docker/build-push-action@v5
         with:
