@@ -142,7 +142,7 @@ end
     Q --> R[🔑 Run Key Generate + Migrations]
     R -->|❌| RB1[⚠️ Auto Rollback → Previous Release]
     R -->|✅| S[🔁 Update Symlink to Current]
-    S --> T[🧹 Remove Old Releases (keep last 5)]
+    S --> T[🧹 Remove Old Releases]
     T --> U[♻️ Reload PHP-FPM and Nginx]
 end
 
