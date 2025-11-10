@@ -61,7 +61,7 @@ jobs:
       
       - name: 🐳 Build Laravel Docker Image
         run: |
-          docker build --build-arg APP_ENV=production -t ${{ secrets.APP_DIR }} .
+          docker build -t ${{ secrets.APP_DIR }} .
 
       - name: 🐳 Start Laravel Container
         run: |
