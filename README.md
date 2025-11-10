@@ -100,6 +100,20 @@ sudo chmod -R ug+rwx /var/www/<APP_DIR>/storage /var/www/<APP_DIR>/bootstrap/cac
 
 ---
 
+
+```mermaid
+graph TD
+  A[🧠 Analyze Stage] -->|✅| B[🐳 Build & Test Stage]
+  B -->|✅| C[🚀 Deploy Stage]
+  C -->|✅| D[♻️ Reload PHP-FPM + Nginx]
+  D -->|✅| E[🎉 Deployment Successful]
+  A -->|❌| X1[⚠️ Fail: Code/Dependency Issue]
+  B -->|❌| X2[⚠️ Fail: Build/Test Issue]
+  C -->|❌| X3[⚠️ Fail: Deployment Error]
+  X3 --> F[🔁 Manual Rollback Triggered]
+
+```
+
 ```mermaid
 flowchart TD;
 
