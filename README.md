@@ -1,149 +1,87 @@
-# 🚀 Laravel Dockerized CI/CD Pipeline with GitHub Actions and AWS EC2
+# 🚀 Laravel CI/CD Pipeline with Docker, Security Scans & Automated Deployment
 
-### Author: **Makresh Nayak**  
-### Technologies: Laravel • Docker • Nginx • MySQL • GitHub Actions • AWS EC2 • DevOps Automation
-
----
-
-## 🧭 Overview
-
-This repository demonstrates a **complete DevOps workflow** for a Laravel application — from local containerization to automated deployment on AWS EC2 using GitHub Actions.
-
-It focuses on building a **modern, production-grade Laravel environment** with CI/CD automation, environment initialization, and infrastructure orchestration.
+This repository demonstrates a **complete CI/CD (Continuous Integration and Deployment) pipeline** for a Laravel application using **GitHub Actions** and **Docker**.  
+It automates everything — from code analysis and testing to secure image builds and deployment to AWS EC2.
 
 ---
 
-## ⚙️ Core Concepts Implemented
+## 🧠 Overview
 
-### 🐳 **Dockerization**
-- Laravel app containerized using a **multi-stage PHP-FPM image**.
-- **Nginx** reverse proxy configured to serve Laravel from `/public`.
-- **MySQL** database container with persistent volume storage.
-- Organized **Docker Compose** stack for app, webserver, and database.
+The pipeline ensures every code change is:
+- **Analyzed** for code quality and vulnerabilities  
+- **Tested** inside a real Docker container  
+- **Packaged** as a secure, versioned Docker image  
+- **Deployed** automatically to production  
+- **Fully auditable**, consistent, and hands-free  
 
-### 🔑 **Automation**
-- Custom **entrypoint script** to:
-  - Wait for MySQL container readiness.
-  - Automatically generate `APP_KEY` (if missing).
-  - Run database migrations during startup.
-
-### 🌐 **Local Development**
-- Local domain mapping via `/etc/hosts` (e.g., `http://myapp.local`).
-- Clean reverse-proxy routing through Nginx (port 80 only).
-- Consistent environment between local and production.
-
-### 🧪 **CI/CD Pipeline**
-- **GitHub Actions** workflow automates:
-  - Composer dependency installation.
-  - Application testing and migrations.
-  - Docker image build process.
-- Supports **continuous delivery** directly to AWS EC2.
-
-### ☁️ **AWS EC2 Deployment**
-- Automated deployment using **appleboy/ssh-action**.
-- Pulls latest code, rebuilds containers, and redeploys app.
-- Zero-downtime restarts using `docker-compose up -d --build`.
-- Full container lifecycle managed remotely via CI/CD.
+This approach delivers a **reliable, secure, and production-grade** Laravel deployment process.
 
 ---
 
-## 🧱 Infrastructure Highlights
+## ⚙️ Pipeline Highlights
 
-| Component | Purpose |
-|------------|----------|
-| **Laravel App (PHP-FPM)** | Core application runtime |
-| **Nginx** | Reverse proxy + static file serving |
-| **MySQL** | Application database |
-| **Docker Compose** | Container orchestration |
-| **Volumes** | Persistent database storage |
-| **GitHub Actions** | Continuous integration & deployment |
-| **AWS EC2** | Production host environment |
+### 🧩 1. Code Quality and Security Analysis
+Every push triggers automated scans to maintain reliability and safety:
+- **Laravel Pint** enforces clean and consistent code formatting.
+- **PHPStan / Larastan** performs static code analysis to detect hidden bugs and type errors.
+- **Composer Audit** checks PHP dependencies against known vulnerabilities.
+- **Trivy** scans Docker base images for OS-level and library security issues.
 
----
-
-## 🧩 DevOps Techniques Used
-
-| Technique | Description |
-|------------|-------------|
-| **Multi-Stage Builds** | Reduced image size and faster caching |
-| **Container Networking** | Internal communication between app and DB |
-| **Reverse Proxy** | Portless URL access and routing control |
-| **Startup Automation** | Self-configuring Laravel container |
-| **Continuous Integration** | Automated testing and building |
-| **Continuous Deployment** | Auto-deploy to EC2 via SSH |
-| **Environment Isolation** | Consistent parity between environments |
-| **Health Checks** | Ensured MySQL readiness before app start |
-| **Version Control Integration** | Triggered workflows on `main` branch pushes |
+✅ Only clean, safe, and secure code advances to the next stage.
 
 ---
 
-## 🧠 DevOps Principles Applied
+### 🐳 2. Docker-Based Build and Testing
+Using **Docker Buildx**, the pipeline builds the Laravel application image directly from your project’s Dockerfile.  
+A temporary container is then created to:
+- Generate an app key  
+- Run migrations  
+- Execute Laravel’s test suite (`php artisan test`)  
 
-1. **Infrastructure as Code (IaC)** – Every service defined declaratively.  
-2. **Immutable Builds** – Docker images rebuilt fresh on each deployment.  
-3. **Environment Consistency** – Local, CI, and production environments identical.  
-4. **Automation First** – No manual configuration needed after `git push`.  
-5. **Scalability Ready** – App can be replicated or scaled horizontally.  
-6. **Stateless Containers** – State stored only in persistent Docker volumes.  
-7. **Zero Manual Deployment** – Fully automated GitHub → EC2 pipeline.
-
----
-
-## 🧭 Deployment Flow Summary
-
-
-~~~
-+------------------------+
-| 1️⃣ Push to main branch |
-+-----------+------------+
-            |
-            v
-+------------------------+
-| 🧪 Build & Test in CI  |
-| - Composer install     |
-| - Laravel migrate/test |
-| - Docker build         |
-+-----------+------------+
-            |
-            v
-+------------------------+
-| ✅ Deploy to EC2        |
-| - SSH via secrets       |
-| - Git pull              |
-| - docker-compose up     |
-+------------------------+
-
-~~~
+✅ Tests run in the **same environment as production**, ensuring accuracy and stability.
 
 ---
 
-## 📦 Achievements
+### 📦 3. Verified Image Publishing
+When all tests pass:
+- The image is **tagged and pushed** to Docker Hub (or another registry).  
+- Each image is **versioned automatically** using the GitHub Actions run number.
 
-✅ Fully containerized Laravel environment  
-✅ Automatic environment setup (`key:generate`, `migrate`)  
-✅ Clean reverse-proxy based local URL (`myapp.local`)  
-✅ Continuous Integration with GitHub Actions  
-✅ Continuous Deployment to AWS EC2 via SSH  
-✅ Infrastructure reproducibility with Docker Compose  
-✅ Developer-friendly and production-safe workflow  
+✅ Guarantees every deployed image is tested, reproducible, and traceable.
 
 ---
 
-## 🧩 Future Enhancements
+### 🚀 4. Automated Deployment to EC2
+The pipeline securely connects to your **AWS EC2** instance:
+- Pulls the latest image from Docker Hub  
+- Stops and removes the previous container  
+- Starts a new container automatically with updated environment variables  
 
-- Add **phpMyAdmin** for database management  
-- Add **Redis** for cache and queue support  
-- Add **SSL/HTTPS** via Let’s Encrypt or Traefik  
-- Push Docker images to **Docker Hub or AWS ECR**  
-- Add **Blue-Green deployment** strategy for zero downtime  
+✅ The deployment is fully automated — no manual server steps required.
+
+---
+
+### 🔒 5. DevSecOps Integration
+The workflow applies **DevSecOps principles** by embedding security and compliance checks into every stage:
+- Continuous vulnerability scanning  
+- Code and dependency audits  
+- Immutable Docker image builds  
+- Secure secret management through GitHub Secrets  
+
+✅ The pipeline ensures security, stability, and compliance — before, during, and after deployment.
 
 ---
 
-## 🏁 Final Words
+## 🧱 CI/CD Pipeline Flow (Visual Diagram)
 
-> “This project follows the modern DevOps philosophy — build once, ship anywhere, and automate everything.”  
->
-> **From local Docker setup → GitHub Actions CI/CD → AWS EC2 deployment**,  
-> this workflow achieves end-to-end delivery automation with Laravel.
-
----
+```mermaid
+flowchart TD
+    A[👨‍💻 Developer pushes code] --> B[🔍 Code Quality & Security Analysis]
+    B --> C[🐳 Docker Build & Containerized Testing]
+    C --> D[✅ Tests Passed]
+    D --> E[📦 Push Verified Docker Image to Registry]
+    E --> F[🚀 Deploy to AWS EC2]
+    F --> G[🌐 Laravel App Live in Production]
+    
+    B -.->|❌ Fails| X[⚠️ Stop Pipeline - Fix Issues]
+    C -.->|❌ Tests Fail| X
