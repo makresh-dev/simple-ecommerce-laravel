@@ -3,7 +3,7 @@ name: Laravel CI/CD with Docker + Security Checks
 on:
   push:
     branches:
-      - master
+      - main
 
 jobs:
   # 1️⃣ CODE QUALITY & SECURITY ANALYSIS
@@ -24,6 +24,16 @@ jobs:
 
       - name: 📦 Install Dependencies (with dev)
         run: composer install --no-interaction --prefer-dist --optimize-autoloader --dev
+
+      # ✅ Auto-install Laravel Pint if missing
+      - name: 🎨 Ensure Laravel Pint is Installed
+        run: |
+          if [ ! -f ./vendor/bin/pint ]; then
+            echo "📦 Laravel Pint not found — installing..."
+            composer require laravel/pint --dev
+          else
+            echo "✅ Laravel Pint already installed."
+          fi
 
       - name: 🎨 Code Style Check (Laravel Pint)
         run: ./vendor/bin/pint --test
@@ -86,6 +96,7 @@ jobs:
 
       - name: 🧪 Run Tests inside Container
         run: |
+          echo "🚀 Starting test container..."
           docker run -d --name laravel-test \
             --network host \
             -e APP_ENV=testing \
@@ -96,9 +107,17 @@ jobs:
             -e DB_USERNAME=root \
             -e DB_PASSWORD=root \
             laravel-app:test
+
+          echo "🔑 Generating app key..."
           docker exec laravel-test php artisan key:generate --force --env=testing
+
+          echo "🗄️ Running migrations..."
           docker exec laravel-test php artisan migrate --force --env=testing
+
+          echo "🧪 Running tests..."
           docker exec laravel-test php artisan test --env=testing
+
+          echo "🧹 Cleaning up test container..."
           docker stop laravel-test
           docker rm laravel-test
 
