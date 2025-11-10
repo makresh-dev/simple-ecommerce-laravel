@@ -110,64 +110,55 @@ ls -1t | tail -n +6 | xargs sudo rm -rf
 
 
 ```mermaid
-    flowchart TD
+flowchart TD;
+    A[👨‍💻 Push to Master Branch] --> B[⚙️ GitHub Actions Triggered];
+    subgraph CI["🧠 Continuous Integration"];
+    B --> C[🎨 Laravel Pint - Code Style];
+    C --> D[🔍 PHPStan - Static Analysis];
+    D --> E[🧩 Composer Audit - Security];
+    E --> F[🐳 Trivy - Dockerfile Security Scan];
+    F --> G{✅ All Checks Passed?};
+    G -->|❌| X1[❌ Fail → Notify Slack/Telegram];
+    G -->|✅| H[🏗️ Build Docker Image];
+    end'
+    subgraph TEST["🧪 Containerized Testing"];
+    H --> I[🗂️ Start MySQL Container];
+    I --> J[🗝️ Generate .env and App Key];
+    J --> K[📜 Run Migrations];
+    K --> L[🧪 Execute Unit/Feature Tests];
+    L --> M[🧹 Clean Test Containers];
+    end;
+    M --> N{✅ Tests Successful?};
+    N -->|❌| X2[❌ Fail → Notify Slack/Telegram];
+    N-->|✅| O[🚀 Deploy to AWS EC2];
+    subgraph DEPLOY["🚀 Deployment Stage"];
+    O --> P[📦 Create New Release Directory];
+    P --> Q[⚙️ Install Dependencies];
+    Q --> R[🔑 Run Key Generate + Migrations];
+    R -->|❌| RB1[⚠️ Auto Rollback → Previous Release];
+    R -->|✅| S[🔁 Update Symlink to Current];
+    S --> T[🧹 Remove Old Releases (>5)];
+    T --> U[♻️ Reload PHP-FPM + Nginx];
+    end;
+    U --> V[📣 Notify Slack/Telegram: Success];
+    RB1 --> V2[📣 Notify Slack/Telegram: Rollback Completed];
+```
 
-A[👨‍💻 Push to Master Branch] --> B[⚙️ GitHub Actions Triggered]
-
-subgraph CI["🧠 Continuous Integration"]
-B --> C[🎨 Laravel Pint - Code Style]
-C --> D[🔍 PHPStan - Static Analysis]
-D --> E[🧩 Composer Audit - Security]
-E --> F[🐳 Trivy - Dockerfile Security Scan]
-F --> G{✅ All Checks Passed?}
-G -->|❌| X1[❌ Fail → Notify Slack/Telegram]
-G -->|✅| H[🏗️ Build Docker Image]
+```mermaid
+flowchart TD;
+    A[⚙️ Deployment Starts] --> B[🏗️ Composer Install]
+    B --> C[🔑 Key Generate + Migrate]
+    C --> D{✅ Deployment Successful?}
+    D -->|✅ Yes| E[Update 'current' Symlink]
+    E --> F[♻️ Reload Services]
+    F --> G[📣 Notify Slack/Telegram: Success]
+    D -->|❌ No| H[⚠️ Auto Rollback Triggered]
+    H --> I[Find Previous Release]
+    I --> J[Revert Symlink to Previous]
+    J --> K[♻️ Reload Services]
+    K --> L[📣 Notify Slack/Telegram: Rollback Completed]
+    subgraph MANUAL["🕓 Manual Rollback Trigger"]
+    X[User Triggers rollback=true in GitHub Actions]
+    X --> I
 end
-
-subgraph TEST["🧪 Containerized Testing"]
-H --> I[🗂️ Start MySQL Container]
-I --> J[🗝️ Generate .env and App Key]
-J --> K[📜 Run Migrations]
-K --> L[🧪 Execute Unit/Feature Tests]
-L --> M[🧹 Clean Test Containers]
-end
-
-M --> N{✅ Tests Successful?}
-N -->|❌| X2[❌ Fail → Notify Slack/Telegram]
-N -->|✅| O[🚀 Deploy to AWS EC2]
-
-subgraph DEPLOY["🚀 Deployment Stage"]
-O --> P[📦 Create New Release Directory]
-P --> Q[⚙️ Install Dependencies]
-Q --> R[🔑 Run Key Generate + Migrations]
-R -->|❌| RB1[⚠️ Auto Rollback → Previous Release]
-R -->|✅| S[🔁 Update Symlink to Current]
-S --> T[🧹 Remove Old Releases (>5)]
-T --> U[♻️ Reload PHP-FPM + Nginx]
-end
-
-U --> V[📣 Notify Slack/Telegram: Success]
-RB1 --> V2[📣 Notify Slack/Telegram: Rollback Completed]
-
-
-
-flowchart TD
-
-A[⚙️ Deployment Starts] --> B[🏗️ Composer Install]
-B --> C[🔑 Key Generate + Migrate]
-C --> D{✅ Deployment Successful?}
-
-D -->|✅ Yes| E[Update 'current' Symlink]
-E --> F[♻️ Reload Services]
-F --> G[📣 Notify Slack/Telegram: Success]
-
-D -->|❌ No| H[⚠️ Auto Rollback Triggered]
-H --> I[Find Previous Release]
-I --> J[Revert Symlink to Previous]
-J --> K[♻️ Reload Services]
-K --> L[📣 Notify Slack/Telegram: Rollback Completed]
-
-subgraph MANUAL["🕓 Manual Rollback Trigger"]
-X[User Triggers rollback=true in GitHub Actions]
-X --> I
-end
+```
