@@ -1,4 +1,4 @@
-name: Laravel CI/CD with Docker + Security Checks (Non-blocking Lint & Audit)
+name: Laravel CI/CD with Docker + Security Checks (Stable with .env Fix)
 
 on:
   push:
@@ -102,10 +102,11 @@ jobs:
           context: .
           file: ./Dockerfile
           push: false
-          load: true   # ✅ ensures the built image is available to `docker run`
+          load: true   # ✅ Ensures the image is available to docker run
           tags: laravel-app:test
           build-args: APP_ENV=production
 
+      # ✅ FIX: Inject temporary .env inside container before artisan commands
       - name: 🧪 Run Tests inside Container
         run: |
           echo "🚀 Starting test container..."
@@ -119,6 +120,23 @@ jobs:
             -e DB_USERNAME=root \
             -e DB_PASSWORD=root \
             laravel-app:test
+
+          echo "📝 Creating temporary .env inside container..."
+          docker exec laravel-test bash -c "cat <<EOF > /var/www/html/.env
+APP_NAME=Laravel
+APP_ENV=testing
+APP_KEY=
+APP_DEBUG=true
+APP_URL=http://localhost
+
+LOG_CHANNEL=stack
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=laravel_ecommerce
+DB_USERNAME=root
+DB_PASSWORD=root
+EOF"
 
           echo "🔑 Generating app key..."
           docker exec laravel-test php artisan key:generate --force --env=testing
