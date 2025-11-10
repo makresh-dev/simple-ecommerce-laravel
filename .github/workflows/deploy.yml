@@ -1,15 +1,66 @@
-name: Laravel CI/CD with Docker
+name: Laravel CI/CD with Docker + Security Checks
 
 on:
   push:
     branches:
-      - master  # or your default branch (master)
+      - main
 
 jobs:
-  # 1️⃣ BUILD & PUSH DOCKER IMAGE
-  build:
-    name: 🐳 Build Laravel Docker Image
+  # 1️⃣ CODE QUALITY & SECURITY ANALYSIS
+  analyze:
+    name: 🧠 Code & Security Analysis
     runs-on: ubuntu-latest
+
+    steps:
+      - name: 🧭 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🧱 Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, xml, bcmath, json, tokenizer, curl, zip
+          coverage: none
+
+      - name: 📦 Install Dependencies (with dev)
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader --dev
+
+      - name: 🎨 Code Style Check (Laravel Pint)
+        run: ./vendor/bin/pint --test
+
+      - name: 🔍 Static Analysis (PHPStan)
+        run: ./vendor/bin/phpstan analyse --memory-limit=512M
+
+      - name: 🧩 Composer Security Audit
+        run: composer audit || true
+
+      - name: 🐳 Dockerfile Security Scan (Trivy)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: docker.io/library/php:8.2-fpm
+          format: table
+          exit-code: 0
+          vuln-type: os,library
+
+  # 2️⃣ BUILD & TEST DOCKER IMAGE
+  build_and_test:
+    name: 🧱 Build & Test Laravel Image
+    runs-on: ubuntu-latest
+    needs: analyze
+
+    services:
+      mysql:
+        image: mysql:8.0
+        ports:
+          - 3306:3306
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: laravel_ecommerce
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
 
     steps:
       - name: 🧭 Checkout Code
@@ -24,29 +75,53 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: 🏗️ Build & Push Laravel Image
+      - name: 🏗️ Build Docker Image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
-          push: true               # set to false if testing locally
+          push: false
+          tags: laravel-app:test
+          build-args: APP_ENV=production
+
+      - name: 🧪 Run Tests inside Container
+        run: |
+          docker run -d --name laravel-test \
+            --network host \
+            -e APP_ENV=testing \
+            -e DB_CONNECTION=mysql \
+            -e DB_HOST=127.0.0.1 \
+            -e DB_PORT=3306 \
+            -e DB_DATABASE=laravel_ecommerce \
+            -e DB_USERNAME=root \
+            -e DB_PASSWORD=root \
+            laravel-app:test
+          docker exec laravel-test php artisan key:generate --force --env=testing
+          docker exec laravel-test php artisan migrate --force --env=testing
+          docker exec laravel-test php artisan test --env=testing
+          docker stop laravel-test
+          docker rm laravel-test
+
+      - name: 🐳 Push Docker Image to Docker Hub
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/laravel-app:latest
             ${{ secrets.DOCKER_USERNAME }}/laravel-app:${{ github.run_number }}
-          build-args: |
-            APP_ENV=production
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          build-args: APP_ENV=production
 
-  # 2️⃣ DEPLOY TO EC2
+  # 3️⃣ DEPLOY TO EC2
   deploy:
     name: 🚀 Deploy to EC2
     runs-on: ubuntu-latest
-    needs: build
+    needs: build_and_test
     if: success()
 
     steps:
-      - name: ⚙️ SSH and Deploy on EC2
+      - name: ⚙️ SSH & Deploy on EC2
         uses: appleboy/ssh-action@v0.1.7
         with:
           host: ${{ secrets.HOST }}
@@ -56,7 +131,7 @@ jobs:
             echo "🧱 Pulling latest Docker image..."
             docker pull ${{ secrets.DOCKER_USERNAME }}/laravel-app:latest
 
-            echo "🧹 Stopping old containers..."
+            echo "🧹 Stopping old container..."
             docker stop laravel-app || true
             docker rm laravel-app || true
 
@@ -74,4 +149,4 @@ jobs:
               -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
               ${{ secrets.DOCKER_USERNAME }}/laravel-app:latest
 
-            echo "✅ Deployment successful."
+            echo "✅ Deployment completed successfully!"
