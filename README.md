@@ -109,7 +109,6 @@ ls -1t | tail -n +6 | xargs sudo rm -rf
 
 
 
-```mermaid
 flowchart TD;
     A[👨‍💻 Push to Master Branch] --> B[⚙️ GitHub Actions Triggered]
     subgraph CI["🧠 Continuous Integration"]
@@ -137,12 +136,11 @@ end
     Q --> R[🔑 Run Key Generate + Migrations]
     R -->|❌| RB1[⚠️ Auto Rollback → Previous Release]
     R -->|✅| S[🔁 Update Symlink to Current]
-    S --> T[🧹 Remove Old Releases (>5)]
+    S --> T["🧹 Remove Old Releases (>5)"]
     T --> U[♻️ Reload PHP-FPM + Nginx]
 end
     U --> V[📣 Notify Slack/Telegram: Success]
     RB1 --> V2[📣 Notify Slack/Telegram: Rollback Completed]
-```
 
 ```mermaid
 flowchart TD;
