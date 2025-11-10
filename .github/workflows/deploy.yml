@@ -3,7 +3,7 @@ name: Laravel CI/CD with Docker + Security Checks
 on:
   push:
     branches:
-      - main
+      - master
 
 jobs:
   # 1️⃣ CODE QUALITY & SECURITY ANALYSIS
