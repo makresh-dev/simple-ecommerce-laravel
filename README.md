@@ -108,7 +108,7 @@ ls -1t | tail -n +6 | xargs sudo rm -rf
 
 
 ```mermaid
-    flowchart TD
+flowchart TD
 
 A[👨‍💻 Push to Master Branch] --> B[⚙️ GitHub Actions Triggered]
 
