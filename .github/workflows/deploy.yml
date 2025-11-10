@@ -1,4 +1,4 @@
-name: Laravel CI/CD with Docker + Security Checks (Stable with .env Fix)
+name: Laravel CI/CD with Docker + Layer Caching + Security Checks
 
 on:
   push:
@@ -38,20 +38,20 @@ jobs:
       - name: 🎨 Code Style Check (Laravel Pint)
         continue-on-error: true
         run: |
-          echo "🎨 Running Laravel Pint code style check..."
-          ./vendor/bin/pint --test || echo "⚠️ Code style issues found. Please run './vendor/bin/pint' locally to fix them."
+          echo "🎨 Running Laravel Pint..."
+          ./vendor/bin/pint --test || echo "⚠️ Code style issues found. Please run './vendor/bin/pint' locally."
 
       - name: 🔍 Static Analysis (PHPStan)
         continue-on-error: true
         run: |
-          echo "🔍 Running static analysis..."
-          ./vendor/bin/phpstan analyse --memory-limit=512M || echo "⚠️ Static analysis found issues. Review PHPStan output."
+          echo "🔍 Running PHPStan..."
+          ./vendor/bin/phpstan analyse --memory-limit=512M || echo "⚠️ PHPStan found issues."
 
       - name: 🧩 Composer Security Audit
         continue-on-error: true
         run: |
           echo "🧩 Running Composer security audit..."
-          composer audit || echo "⚠️ Vulnerabilities detected in dependencies. Review 'composer audit' output."
+          composer audit || echo "⚠️ Vulnerabilities detected."
 
       - name: 🐳 Dockerfile Security Scan (Trivy)
         continue-on-error: true
@@ -89,24 +89,34 @@ jobs:
       - name: 🐳 Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: 🗂️ Cache Docker Layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
       - name: 🔐 Log in to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # ✅ FIX: Load image into local Docker for testing
-      - name: 🏗️ Build Docker Image (and load locally)
+      # ✅ Build & Load Locally with Docker Layer Caching
+      - name: 🏗️ Build Docker Image (with caching)
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
           push: false
-          load: true   # ✅ Ensures the image is available to docker run
+          load: true
           tags: laravel-app:test
-          build-args: APP_ENV=production
+          build-args: |
+            APP_ENV=production
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
 
-      # ✅ FIX: Inject temporary .env inside container before artisan commands
       - name: 🧪 Run Tests inside Container
         run: |
           echo "🚀 Starting test container..."
@@ -151,6 +161,13 @@ EOF"
           docker stop laravel-test
           docker rm laravel-test
 
+      # ✅ Save new Docker cache (so next build is faster)
+      - name: 💾 Save Docker Cache
+        if: always()
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
       - name: 🐳 Push Docker Image to Docker Hub
         uses: docker/build-push-action@v5
         with:
@@ -160,7 +177,10 @@ EOF"
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/laravel-app:latest
             ${{ secrets.DOCKER_USERNAME }}/laravel-app:${{ github.run_number }}
-          build-args: APP_ENV=production
+          build-args: |
+            APP_ENV=production
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
 
   # 3️⃣ DEPLOY TO EC2
   deploy:
