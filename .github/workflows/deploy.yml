@@ -37,21 +37,15 @@ jobs:
 
       - name: 🎨 Code Style Check (Laravel Pint)
         continue-on-error: true
-        run: |
-          echo "🎨 Running Laravel Pint..."
-          ./vendor/bin/pint --test || echo "⚠️ Code style issues found. Please run './vendor/bin/pint' locally."
+        run: ./vendor/bin/pint --test || echo "⚠️ Code style issues found. Please run './vendor/bin/pint' locally."
 
       - name: 🔍 Static Analysis (PHPStan)
         continue-on-error: true
-        run: |
-          echo "🔍 Running PHPStan..."
-          ./vendor/bin/phpstan analyse --memory-limit=512M || echo "⚠️ PHPStan found issues."
+        run: ./vendor/bin/phpstan analyse --memory-limit=512M || echo "⚠️ PHPStan found issues."
 
       - name: 🧩 Composer Security Audit
         continue-on-error: true
-        run: |
-          echo "🧩 Running Composer security audit..."
-          composer audit || echo "⚠️ Vulnerabilities detected."
+        run: composer audit || echo "⚠️ Vulnerabilities detected."
 
       - name: 🐳 Dockerfile Security Scan (Trivy)
         continue-on-error: true
@@ -112,11 +106,11 @@ jobs:
           push: false
           load: true
           tags: laravel-app:test
-          build-args: |
-            APP_ENV=production
+          build-args: APP_ENV=production
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
 
+      # ✅ Create .env file on runner and copy into container
       - name: 🧪 Run Tests inside Container
         run: |
           echo "🚀 Starting test container..."
@@ -131,8 +125,8 @@ jobs:
             -e DB_PASSWORD=root \
             laravel-app:test
 
-          echo "📝 Creating temporary .env inside container..."
-          docker exec laravel-test bash -c "cat <<EOF > /var/www/html/.env
+          echo "📝 Creating temporary .env file on runner..."
+          cat <<EOF > .env
 APP_NAME=Laravel
 APP_ENV=testing
 APP_KEY=
@@ -146,7 +140,10 @@ DB_PORT=3306
 DB_DATABASE=laravel_ecommerce
 DB_USERNAME=root
 DB_PASSWORD=root
-EOF"
+EOF
+
+          echo "📦 Copying .env into container..."
+          docker cp .env laravel-test:/var/www/html/.env
 
           echo "🔑 Generating app key..."
           docker exec laravel-test php artisan key:generate --force --env=testing
@@ -160,6 +157,7 @@ EOF"
           echo "🧹 Cleaning up test container..."
           docker stop laravel-test
           docker rm laravel-test
+          rm .env
 
       # ✅ Save new Docker cache (so next build is faster)
       - name: 💾 Save Docker Cache
@@ -177,8 +175,7 @@ EOF"
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/laravel-app:latest
             ${{ secrets.DOCKER_USERNAME }}/laravel-app:${{ github.run_number }}
-          build-args: |
-            APP_ENV=production
+          build-args: APP_ENV=production
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
 
