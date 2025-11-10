@@ -44,7 +44,7 @@ jobs:
           extensions: mbstring, xml, bcmath, mysql, zip, gd
 
       - name: 📦 Install Composer Dependencies (with dev)
-        run: composer update
+        run: composer update && composer install --dev
 
       - name: 🔧 Fix Permissions Pre-Build
         run: |
