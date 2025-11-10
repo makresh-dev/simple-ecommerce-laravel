@@ -109,6 +109,7 @@ ls -1t | tail -n +6 | xargs sudo rm -rf
 
 
 
+```mermaid
 flowchart TD;
     A[👨‍💻 Push to Master Branch] --> B[⚙️ GitHub Actions Triggered]
     subgraph CI["🧠 Continuous Integration"]
@@ -119,14 +120,12 @@ flowchart TD;
     F --> G{✅ All Checks Passed?}
     G -->|❌| X1[❌ Fail → Notify Slack/Telegram]
     G -->|✅| H[🏗️ Build Docker Image]
-end
     subgraph TEST["🧪 Containerized Testing"]
     H --> I[🗂️ Start MySQL Container]
     I --> J[🗝️ Generate .env and App Key]
     J --> K[📜 Run Migrations]
     K --> L[🧪 Execute Unit/Feature Tests]
     L --> M[🧹 Clean Test Containers]
-end
     M --> N{✅ Tests Successful?}
     N -->|❌| X2[❌ Fail → Notify Slack/Telegram]
     N-->|✅| O[🚀 Deploy to AWS EC2]
@@ -136,11 +135,12 @@ end
     Q --> R[🔑 Run Key Generate + Migrations]
     R -->|❌| RB1[⚠️ Auto Rollback → Previous Release]
     R -->|✅| S[🔁 Update Symlink to Current]
-    S --> T["🧹 Remove Old Releases (>5)"]
+    S --> T[🧹 Remove Old Releases (>5)]
     T --> U[♻️ Reload PHP-FPM + Nginx]
-end
     U --> V[📣 Notify Slack/Telegram: Success]
     RB1 --> V2[📣 Notify Slack/Telegram: Rollback Completed]
+end
+```
 
 ```mermaid
 flowchart TD;
