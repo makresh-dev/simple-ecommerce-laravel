@@ -95,12 +95,14 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: 🏗️ Build Docker Image
+      # ✅ FIX: Load image into local Docker for testing
+      - name: 🏗️ Build Docker Image (and load locally)
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
           push: false
+          load: true   # ✅ ensures the built image is available to `docker run`
           tags: laravel-app:test
           build-args: APP_ENV=production
 
