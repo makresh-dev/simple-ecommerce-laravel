@@ -1,171 +1,152 @@
-# 🚀 Laravel CI/CD Pipeline with Docker, EC2 Deployment, Rollback & Notifications
+# 🚀 Laravel CI/CD Pipeline with Docker, GitHub Actions & EC2 Deployment
 
-A fully automated **CI/CD pipeline** for Laravel applications using **GitHub Actions**, **Docker**, and **AWS EC2**.
+A **production-grade CI/CD pipeline** for Laravel applications built with:
 
-It features:
-- 🧠 Code Quality & Security Analysis  
-- 🐳 Containerized Build & Testing  
-- 🚀 Automated Deployment with Zero Downtime  
-- 🔁 Automatic & Manual Rollback System  
-- 🔔 Slack & Telegram Notifications  
-- 🧹 Release Cleanup (Keep last 5 versions)
+- 🧱 **GitHub Actions** for automation  
+- 🐳 **Docker** for isolated builds & tests  
+- ☁️ **AWS EC2** for secure deployment  
+- 🧩 **Composer, PHPStan, Pint, and Trivy** for quality and security  
 
----
-
-## 🧭 Overview
-
-Every push to the **`master`** branch triggers:
-1. Code quality and security checks  
-2. Docker image build and tests  
-3. Deployment to EC2  
-4. Automatic rollback on failure  
-5. Slack & Telegram notifications  
-
-You can also **manually trigger rollback** if needed from the GitHub Actions UI.
+This pipeline ensures **continuous integration, testing, and deployment** without manual intervention.
 
 ---
 
-## 🧱 Folder Structure on EC2
+## 🧭 CI/CD Overview
 
-After deployment, your Laravel project will be structured like this:
+Every push to the `master` branch triggers a sequence of stages:
 
-~~~
-/var/www/<APP_DIR>/
-├── releases/
-│ ├── 20251106_204501/
-│ ├── 20251107_132314/
-│ ├── 20251108_191845/
-│ ├── 20251109_183305/
-│ └── 20251110_130212/ ← current deployment
-└── current → releases/20251110_130212/
-~~~
-
-
-✅ `current` → symbolic link to the latest release  
-🧩 Keeps older releases for rollback  
-🧹 Cleans older releases (keeps latest 5)
+1. 🧠 **Code Analysis & Security Checks**  
+2. 🐳 **Docker Build & Test Environment**  
+3. 🚀 **Deployment to AWS EC2 Server**  
 
 ---
 
-## ⚙️ Workflow Stages
-
-### 1️⃣ Code Analysis & Security Checks
-Performs linting and static analysis before building:
+## ⚙️ Stage 1 — Code Analysis & Security Checks
 
 | Tool | Purpose |
 |------|----------|
-| Laravel Pint | Code style consistency |
-| PHPStan | Static analysis |
-| Composer Audit | Vulnerability check |
-| Trivy | Dockerfile security scan |
+| **Laravel Pint** | Ensures coding standards and PSR-12 compliance |
+| **PHPStan** | Static analysis for code quality |
+| **Composer Audit** | Checks for dependency vulnerabilities |
+| **Trivy** | Scans Docker images for OS and library vulnerabilities |
+
+🧩 The stage runs automatically and doesn’t stop the pipeline on minor warnings.  
+If critical issues exist, you’ll see them logged in GitHub Actions.
 
 ---
 
-### 2️⃣ Build & Test (Dockerized)
-- Builds Laravel Docker image (`php:8.2-fpm`)
-- Starts a temporary MySQL container
-- Generates `.env` dynamically
-- Runs migrations & test suite
-- Cleans containers post-test
+## 🧱 Stage 2 — Dockerized Build & Testing
+
+This stage **builds the Laravel app into a Docker image** and runs tests inside a containerized environment.
+
+### 🧩 Key Processes
+
+1. **Build the Docker image** using caching for faster builds.
+2. **Start a temporary MySQL service** inside the GitHub runner.
+3. **Inject a temporary `.env` file** for database and app config.
+4. **Set correct file & directory permissions**.
+5. **Run Laravel migrations**.
+6. **Run automated tests**, supporting:
+   - `php artisan test` (Laravel ≥ 8)
+   - `vendor/bin/phpunit` (Laravel ≤ 7)
+7. **Skip gracefully** if no test suite is found (so pipeline doesn’t fail unnecessarily).
+
+### 🧠 Intelligent Test Detection
+
+- If `php artisan test` exists → runs it.  
+- If not, it falls back to PHPUnit.  
+- If neither exists → skips tests and continues safely.
+
+### 🧰 Environment Variables
+
+| Variable | Description |
+|-----------|-------------|
+| `APP_ENV` | Laravel environment mode (`testing`, `production`) |
+| `DB_HOST` | Database host (local MySQL service) |
+| `DB_DATABASE` | Laravel test database |
+| `DB_USERNAME` | MySQL username |
+| `DB_PASSWORD` | MySQL password |
 
 ---
 
-### 3️⃣ Deployment (AWS EC2)
-- SSHs into EC2 instance  
-- Clones repo and installs dependencies  
-- Copies `.env` file from previous release  
-- Runs migrations & optimization commands  
-- Updates `current` symlink  
-- Reloads PHP-FPM & Nginx (zero downtime)  
+## 🚀 Stage 3 — Deployment to EC2
+
+After successful tests, the pipeline automatically:
+
+1. SSHs into your EC2 instance  
+2. Pulls the latest Laravel code from GitHub  
+3. Installs Composer dependencies  
+4. Fixes file and folder permissions  
+5. Generates the `APP_KEY` if missing  
+6. Runs database migrations  
+7. Reloads PHP-FPM and Nginx for zero downtime
+
+✅ No Docker required on the EC2 server.  
+✅ Uses your existing Nginx + PHP-FPM setup.  
+✅ Works with any Ubuntu-based EC2 instance.
 
 ---
 
-### 4️⃣ Rollback Mechanism
-- **Automatic rollback:** Triggered on any deployment/migration failure  
-- **Manual rollback:** Triggered manually through GitHub workflow dispatch  
+## 🧹 File & Directory Permission Strategy
 
----
+Ensures all Laravel-critical folders are writable and secure:
 
-### 5️⃣ Notifications
-Sends updates via:
-- 💬 **Slack** – team channel updates  
-- 📱 **Telegram** – private or group notifications  
-
-Alerts include:
-- ✅ Successful Deployment  
-- ❌ Failed Deployment (with auto rollback)  
-- ⚠️ Rollback completed  
-- 🕓 Manual rollback executed  
-
----
-
-### 6️⃣ Cleanup System
-After every successful deployment, older releases are cleaned up automatically:
 ```bash
-cd /var/www/<APP_DIR>/releases
-ls -1t | tail -n +6 | xargs sudo rm -rf
+sudo chown -R www-data:www-data /var/www/<APP_DIR>
+sudo find /var/www/<APP_DIR> -type d -exec chmod 775 {} \;
+sudo find /var/www/<APP_DIR> -type f -exec chmod 664 {} \;
+sudo chmod -R ug+rwx /var/www/<APP_DIR>/storage /var/www/<APP_DIR>/bootstrap/cache
 ```
 
-
-
+---
 
 ```mermaid
 flowchart TD;
 
-    A[👨‍💻 Push to Master Branch] --> B[⚙️ GitHub Actions Triggered]
+A[👨‍💻 Push to Master Branch] --> B[⚙️ GitHub Actions Triggered]
 
-    subgraph CI["🧠 Continuous Integration"]
-    B --> C[🎨 Laravel Pint - Code Style]
-    C --> D[🔍 PHPStan - Static Analysis]
-    D --> E[🧩 Composer Audit - Security]
-    E --> F[🐳 Trivy - Dockerfile Security Scan]
-    F --> G{✅ All Checks Passed?}
-    G -->|❌| X1[❌ Fail → Notify Slack/Telegram]
-    G -->|✅| H[🏗️ Build Docker Image]
+subgraph ANALYZE["🧠 Code Analysis & Security Audit"]
+B --> C[🎨 Laravel Pint - Code Style]
+C --> D[🔍 PHPStan - Static Analysis]
+D --> E[🧩 Composer Audit - Dependency Scan]
+E --> F[🐳 Trivy - Dockerfile Vulnerability Scan]
 end
 
-    subgraph TEST["🧪 Containerized Testing"]
-    H --> I[🗂️ Start MySQL Container]
-    I --> J[🗝️ Generate .env and App Key]
-    J --> K[📜 Run Migrations]
-    K --> L[🧪 Execute Unit/Feature Tests]
-    L --> M[🧹 Clean Test Containers]
+F --> G{✅ Passed All Checks?}
+G -->|❌| X1[❌ Fail → Stop Pipeline]
+G -->|✅| H[🏗️ Build Docker Image with Caching]
+
+subgraph TEST["🧪 Build & Test in Docker"]
+H --> I[🗂️ Start MySQL Service]
+I --> J[📝 Create Temporary .env File]
+J --> K[🔧 Fix Permissions]
+K --> L[🔑 Run Artisan Key Generate]
+L --> M[🗄️ Run Migrations]
+M --> N{Run Tests Available?}
+N -->|artisan test| O[Run php artisan test]
+N -->|phpunit| P[Run vendor/bin/phpunit]
+N -->|none| Q[⚠️ Skip Tests Safely]
 end
 
-    M --> N{✅ Tests Successful?}
-    N -->|❌| X2[❌ Fail → Notify Slack/Telegram]
-    N -->|✅| O[🚀 Deploy to AWS EC2]
+O --> R[✅ Tests Passed]
+P --> R
+Q --> R
 
-    subgraph DEPLOY["🚀 Deployment Stage"]
-    O --> P[📦 Create New Release Directory]
-    P --> Q[⚙️ Install Dependencies]
-    Q --> R[🔑 Run Key Generate + Migrations]
-    R -->|❌| RB1[⚠️ Auto Rollback → Previous Release]
-    R -->|✅| S[🔁 Update Symlink to Current]
-    S --> T[🧹 Remove Old Releases]
-    T --> U[♻️ Reload PHP-FPM and Nginx]
+R --> S[🐳 Push Image to Docker Hub]
+S --> T[🚀 Deploy to EC2]
+
+subgraph DEPLOY["🚀 EC2 Deployment"]
+T --> U[🔐 SSH into EC2]
+U --> V[📦 Pull Latest Code from GitHub]
+V --> W[📦 Composer Install]
+W --> X[🔧 Fix Permissions]
+X --> Y[🔑 Generate Key + Migrate DB]
+Y --> Z[♻️ Reload PHP-FPM + Nginx]
 end
 
-    U --> V[📣 Notify Slack/Telegram: ✅ Success]
-    RB1 --> V2[📣 Notify Slack/Telegram: ⚠️ Rollback Completed]
+Z --> AA[✅ Deployment Success Notification]
 
 ```
 
-```mermaid
-flowchart TD;
-    A[⚙️ Deployment Starts] --> B[🏗️ Composer Install]
-    B --> C[🔑 Key Generate + Migrate]
-    C --> D{✅ Deployment Successful?}
-    D -->|✅ Yes| E[Update 'current' Symlink]
-    E --> F[♻️ Reload Services]
-    F --> G[📣 Notify Slack/Telegram: Success]
-    D -->|❌ No| H[⚠️ Auto Rollback Triggered]
-    H --> I[Find Previous Release]
-    I --> J[Revert Symlink to Previous]
-    J --> K[♻️ Reload Services]
-    K --> L[📣 Notify Slack/Telegram: Rollback Completed]
-    subgraph MANUAL["🕓 Manual Rollback Trigger"]
-    X[User Triggers rollback=true in GitHub Actions]
-    X --> I
-end
-```
+
+
