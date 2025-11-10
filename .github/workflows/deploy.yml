@@ -3,7 +3,7 @@ name: Laravel CI/CD with Docker
 on:
   push:
     branches:
-      - main  # or your default branch (master)
+      - master  # or your default branch (master)
 
 jobs:
   # 1️⃣ BUILD & PUSH DOCKER IMAGE
