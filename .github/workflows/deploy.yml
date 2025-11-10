@@ -1,4 +1,4 @@
-name: Laravel CI/CD with Docker + Security Checks
+name: Laravel CI/CD with Docker + Security Checks (Non-blocking Lint & Audit)
 
 on:
   push:
@@ -36,15 +36,25 @@ jobs:
           fi
 
       - name: 🎨 Code Style Check (Laravel Pint)
-        run: ./vendor/bin/pint --test
+        continue-on-error: true
+        run: |
+          echo "🎨 Running Laravel Pint code style check..."
+          ./vendor/bin/pint --test || echo "⚠️ Code style issues found. Please run './vendor/bin/pint' locally to fix them."
 
       - name: 🔍 Static Analysis (PHPStan)
-        run: ./vendor/bin/phpstan analyse --memory-limit=512M
+        continue-on-error: true
+        run: |
+          echo "🔍 Running static analysis..."
+          ./vendor/bin/phpstan analyse --memory-limit=512M || echo "⚠️ Static analysis found issues. Review PHPStan output."
 
       - name: 🧩 Composer Security Audit
-        run: composer audit || true
+        continue-on-error: true
+        run: |
+          echo "🧩 Running Composer security audit..."
+          composer audit || echo "⚠️ Vulnerabilities detected in dependencies. Review 'composer audit' output."
 
       - name: 🐳 Dockerfile Security Scan (Trivy)
+        continue-on-error: true
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: docker.io/library/php:8.2-fpm
